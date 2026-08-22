@@ -9,6 +9,39 @@ import (
 	"strings"
 )
 
+func isExecutable(path string) (bool, string) {
+	if cmd, err := exec.LookPath(path); err == nil {
+		return true, cmd
+	}
+	info, err := os.Stat(path)
+
+	if err != nil {
+		return false, ""
+	}
+
+	return info.Mode()&0111 != 0, path
+}
+
+func handleExecutable(cmd []string) {
+	isExec, _ := isExecutable(cmd[0])
+	if !isExec {
+		fmt.Printf("%s: command not found\n", cmd[0])
+		return
+	}
+
+	command := exec.Command(cmd[0], cmd[1:]...)
+
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+
+	err := command.Run()
+
+	if err != nil {
+		fmt.Println("Error running command:", err.Error())
+		return
+	}
+}
+
 func main() {
 	var builtin = []string{"exit", "echo", "type"}
 
@@ -35,7 +68,7 @@ func main() {
 				fmt.Printf("%s: not found\n", cmd[1])
 			}
 		default:
-			fmt.Printf("%s: command not found\n", command)
+			handleExecutable(cmd)
 		}
 	}
 
