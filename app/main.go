@@ -8,8 +8,40 @@ import (
 	"strings"
 )
 
+func loadPath() []string {
+	path := os.Getenv("PATH")
+	pathDirs := strings.Split(path, ":")
+
+	return pathDirs
+}
+
+func commandInPath(target string, pathDirs []string) (bool, string) {
+	for _, dir := range pathDirs {
+		entry, err := os.ReadDir(dir)
+
+		if err != nil {
+			continue
+		}
+		for _, cmd := range entry {
+			if cmd.IsDir() || cmd.Type().IsRegular() {
+				continue
+			}
+
+			if target == cmd.Name() {
+				return true, fmt.Sprintf("%s/%s", dir, cmd.Name())
+			}
+		}
+
+	}
+
+	return false, ""
+
+}
+
 func main() {
-	path := []string{"exit", "echo", "type"}
+	var builtin = []string{"exit", "echo", "type"}
+	path := loadPath()
+
 	for {
 		fmt.Print("$ ")
 		command, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -25,8 +57,10 @@ func main() {
 		case "echo":
 			fmt.Println(strings.Join(cmd[1:], " "))
 		case "type":
-			if slices.Contains(path, cmd[1]) {
+			if slices.Contains(builtin, cmd[1]) {
 				fmt.Printf("%s is a shell builtin\n", cmd[1])
+			} else if inPath, dir := commandInPath(cmd[1], path); inPath {
+				fmt.Printf("%s is %s\n", cmd[1], dir)
 			} else {
 				fmt.Printf("%s: not found\n", cmd[1])
 			}
