@@ -4,63 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"slices"
 	"strings"
 )
 
-func loadPath() []string {
-	path := os.Getenv("PATH")
-	pathDirs := strings.Split(path, string(os.PathListSeparator))
-
-	return pathDirs
-}
-
-func isExecutable(dir os.FileInfo) bool {
-	return dir.Mode()&0111 != 0
-}
-
-func commandInPath(target string, pathDirs []string) (bool, string) {
-	for _, dir := range pathDirs {
-		dirInfo, statErr := os.Stat(dir)
-
-		if statErr != nil {
-			continue
-		}
-
-		if !dirInfo.Mode().IsDir() {
-			if target == dirInfo.Name() && dirInfo.Mode().IsRegular() && dirInfo.Mode().Perm()&0111 != 0 {
-				return true, fmt.Sprintf("%s", dir)
-			}
-			return false, ""
-		}
-
-		entry, readErr := os.ReadDir(dir)
-
-		if readErr != nil {
-			continue
-		}
-
-		for _, cmd := range entry {
-			cmdInfo, err := cmd.Info()
-
-			if err != nil || cmd.IsDir() || !isExecutable(cmdInfo) {
-				continue
-			}
-
-			if target == cmd.Name() {
-				return true, fmt.Sprintf("%s/%s", dir, cmd.Name())
-			}
-		}
-
-	}
-
-	return false, ""
-
-}
-
 func main() {
 	var builtin = []string{"exit", "echo", "type"}
-	path := loadPath()
 
 	for {
 		fmt.Print("$ ")
@@ -79,7 +29,7 @@ func main() {
 		case "type":
 			if slices.Contains(builtin, cmd[1]) {
 				fmt.Printf("%s is a shell builtin\n", cmd[1])
-			} else if inPath, dir := commandInPath(cmd[1], path); inPath {
+			} else if dir, err := exec.LookPath(cmd[1]); err == nil {
 				fmt.Printf("%s is %s\n", cmd[1], dir)
 			} else {
 				fmt.Printf("%s: not found\n", cmd[1])
