@@ -17,9 +17,24 @@ func loadPath() []string {
 
 func commandInPath(target string, pathDirs []string) (bool, string) {
 	for _, dir := range pathDirs {
-		entry, err := os.ReadDir(dir)
+		dirInfo, statErr := os.Stat(dir)
 
-		if err != nil {
+		if statErr != nil {
+			fmt.Println(statErr.Error())
+			continue
+		}
+
+		if !dirInfo.Mode().IsDir() {
+			if target == dirInfo.Name() {
+				return true, fmt.Sprintf("%s", dir)
+			}
+			return false, ""
+		}
+
+		entry, readErr := os.ReadDir(dir)
+
+		if readErr != nil {
+			fmt.Println(readErr.Error())
 			continue
 		}
 		for _, cmd := range entry {
