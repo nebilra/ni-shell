@@ -43,7 +43,7 @@ func handleExecutable(cmd []string) {
 }
 
 func main() {
-	var builtin = []string{"exit", "echo", "type", "pwd"}
+	var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
 
 	for {
 		fmt.Print("$ ")
@@ -60,7 +60,16 @@ func main() {
 		case "echo":
 			fmt.Println(strings.Join(cmd[1:], " "))
 		case "cd":
-			err := os.Chdir(cmd[1])
+			dir := cmd[1]
+			if cmd[1] == "~" {
+				home, err := os.UserHomeDir()
+				if err != nil {
+					fmt.Printf("cd: %s: No such file or directory\n", cmd[1])
+					break
+				}
+				dir = home
+			}
+			err := os.Chdir(dir)
 
 			if err != nil {
 				fmt.Printf("cd: %s: No such file or directory\n", cmd[1])
