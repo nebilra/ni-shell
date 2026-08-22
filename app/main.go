@@ -24,7 +24,7 @@ func commandInPath(target string, pathDirs []string) (bool, string) {
 		}
 
 		if !dirInfo.Mode().IsDir() {
-			if target == dirInfo.Name() {
+			if target == dirInfo.Name() && dirInfo.Mode().Perm()&0111 != 0 {
 				return true, fmt.Sprintf("%s", dir)
 			}
 			return false, ""
