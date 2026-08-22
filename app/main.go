@@ -20,7 +20,6 @@ func commandInPath(target string, pathDirs []string) (bool, string) {
 		dirInfo, statErr := os.Stat(dir)
 
 		if statErr != nil {
-			fmt.Println(statErr.Error())
 			continue
 		}
 
@@ -34,7 +33,6 @@ func commandInPath(target string, pathDirs []string) (bool, string) {
 		entry, readErr := os.ReadDir(dir)
 
 		if readErr != nil {
-			fmt.Println(readErr.Error())
 			continue
 		}
 		for _, cmd := range entry {
