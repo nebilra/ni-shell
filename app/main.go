@@ -59,11 +59,17 @@ func main() {
 			os.Exit(0)
 		case "echo":
 			fmt.Println(strings.Join(cmd[1:], " "))
+		case "cd":
+			err := os.Chdir(cmd[1])
+
+			if err != nil {
+				fmt.Printf("cd: %s: No such file or directory\n", cmd[1])
+			}
 		case "pwd":
 			dir, err := os.Getwd()
 			if err != nil {
 				fmt.Println(err.Error())
-				continue
+				break
 			}
 			fmt.Println(dir)
 		case "type":
