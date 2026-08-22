@@ -10,7 +10,7 @@ import (
 
 func loadPath() []string {
 	path := os.Getenv("PATH")
-	pathDirs := strings.Split(path, ":")
+	pathDirs := strings.Split(path, string(os.PathListSeparator))
 
 	return pathDirs
 }
