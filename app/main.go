@@ -59,6 +59,13 @@ func main() {
 			os.Exit(0)
 		case "echo":
 			fmt.Println(strings.Join(cmd[1:], " "))
+		case "pwd":
+			dir, err := os.Getwd()
+			if err != nil {
+				fmt.Println(err.Error())
+				continue
+			}
+			fmt.Println(dir)
 		case "type":
 			if slices.Contains(builtin, cmd[1]) {
 				fmt.Printf("%s is a shell builtin\n", cmd[1])
