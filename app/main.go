@@ -15,6 +15,10 @@ func loadPath() []string {
 	return pathDirs
 }
 
+func isExecutable(dir os.FileInfo) bool {
+	return dir.Mode()&0111 != 0
+}
+
 func commandInPath(target string, pathDirs []string) (bool, string) {
 	for _, dir := range pathDirs {
 		dirInfo, statErr := os.Stat(dir)
@@ -24,7 +28,7 @@ func commandInPath(target string, pathDirs []string) (bool, string) {
 		}
 
 		if !dirInfo.Mode().IsDir() {
-			if target == dirInfo.Name() && dirInfo.Mode().Perm()&0111 != 0 {
+			if target == dirInfo.Name() && dirInfo.Mode().IsRegular() && dirInfo.Mode().Perm()&0111 != 0 {
 				return true, fmt.Sprintf("%s", dir)
 			}
 			return false, ""
@@ -37,7 +41,9 @@ func commandInPath(target string, pathDirs []string) (bool, string) {
 		}
 
 		for _, cmd := range entry {
-			if cmd.IsDir() || cmd.Type().Perm()&0111 != 0 {
+			cmdInfo, err := cmd.Info()
+
+			if err != nil || cmd.IsDir() || !isExecutable(cmdInfo) {
 				continue
 			}
 
