@@ -43,7 +43,7 @@ func handleExecutable(cmd []string) {
 }
 
 func main() {
-	var builtin = []string{"exit", "echo", "type"}
+	var builtin = []string{"exit", "echo", "type", "pwd"}
 
 	for {
 		fmt.Print("$ ")
