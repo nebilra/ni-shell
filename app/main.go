@@ -58,8 +58,20 @@ func parseCommand(command string) (string, []string) {
 	var args []string
 	var cur string
 	stack := stack{}
+	var escape bool
 
 	for _, arg := range rest {
+		if arg == '\\' {
+			escape = true
+			continue
+		}
+
+		if escape {
+			cur += string(arg)
+			escape = false
+			continue
+		}
+
 		if len(stack.s) > 0 {
 			if arg == stack.s[len(stack.s)-1] {
 				stack.Pop()
