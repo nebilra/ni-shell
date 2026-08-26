@@ -44,6 +44,14 @@ func parseCommand(command string) (string, []string) {
 	command = strings.TrimSpace(command)
 	parts := strings.SplitN(command, " ", 2)
 
+	if len(parts) == 0 {
+		return "", []string{}
+	}
+
+	if len(parts) == 1 {
+		return parts[0], []string{}
+	}
+
 	cmd := parts[0]
 	rest := parts[1]
 
