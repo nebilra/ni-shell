@@ -29,7 +29,7 @@ func (s *stack) Push(value int) {
 	s.s = append(s.s, value)
 }
 
-func (s stack) Pop() (int, error) {
+func (s *stack) Pop() (int, error) {
 	n := len(s.s)
 	if n == 0 {
 		return 0, errors.New("Empty stack")
@@ -55,6 +55,7 @@ func parseCommand(command string) (string, []string) {
 		if len(stack.s) > 0 {
 			if arg == '\'' {
 				stack.Pop()
+				continue
 			}
 			cur += string(arg)
 			continue
@@ -62,13 +63,12 @@ func parseCommand(command string) (string, []string) {
 
 		if arg == '\'' {
 			stack.Push(idx)
+			continue
 		}
 
-		if arg == ' ' {
-			if len(cur) > 0 {
-				args = append(args, cur)
-				cur = ""
-			}
+		if arg == ' ' && len(cur) > 0 {
+			args = append(args, cur)
+			cur = ""
 			continue
 		}
 		cur += string(arg)
@@ -100,15 +100,6 @@ func handleExecutable(cmd string, args []string) {
 	}
 }
 
-func output(args []string) {
-	var cleanArgs []string
-	for _, arg := range args {
-		cleanArgs = append(cleanArgs, strings.ReplaceAll(arg, "'", ""))
-	}
-
-	fmt.Println(strings.Join(cleanArgs, " "))
-}
-
 func main() {
 	var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
 
@@ -124,7 +115,7 @@ func main() {
 		case "exit":
 			os.Exit(0)
 		case "echo":
-			output(args)
+			fmt.Println(strings.Join(args, " "))
 		case "cd":
 			dir := args[0]
 			if args[0] == "~" {
