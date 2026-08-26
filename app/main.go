@@ -23,13 +23,13 @@ func isExecutable(path string) (bool, string) {
 	return info.Mode()&0111 != 0, path
 }
 
-type stack struct{ s []int }
+type stack struct{ s []rune }
 
-func (s *stack) Push(value int) {
+func (s *stack) Push(value rune) {
 	s.s = append(s.s, value)
 }
 
-func (s *stack) Pop() (int, error) {
+func (s *stack) Pop() (rune, error) {
 	n := len(s.s)
 	if n == 0 {
 		return 0, errors.New("Empty stack")
@@ -59,9 +59,9 @@ func parseCommand(command string) (string, []string) {
 	var cur string
 	stack := stack{}
 
-	for idx, arg := range rest {
+	for _, arg := range rest {
 		if len(stack.s) > 0 {
-			if arg == '\'' {
+			if arg == stack.s[len(stack.s)-1] {
 				stack.Pop()
 				continue
 			}
@@ -69,8 +69,8 @@ func parseCommand(command string) (string, []string) {
 			continue
 		}
 
-		if arg == '\'' {
-			stack.Push(idx)
+		if arg == '\'' || arg == '"' {
+			stack.Push(arg)
 			continue
 		}
 
