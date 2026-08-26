@@ -67,7 +67,7 @@ func parseCommand(command string) (string, []string) {
 			continue
 		}
 
-		if arg == '\\' {
+		if arg == '\\' && !(len(stack.s) > 0 && stack.s[len(stack.s)-1] == '\'') {
 			escape = true
 			continue
 		}
