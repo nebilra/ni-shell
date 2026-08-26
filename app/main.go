@@ -61,14 +61,14 @@ func parseCommand(command string) (string, []string) {
 	var escape bool
 
 	for _, arg := range rest {
-		if arg == '\\' {
-			escape = true
-			continue
-		}
-
 		if escape {
 			cur += string(arg)
 			escape = false
+			continue
+		}
+
+		if arg == '\\' {
+			escape = true
 			continue
 		}
 
