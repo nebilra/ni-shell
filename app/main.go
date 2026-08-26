@@ -55,7 +55,6 @@ func parseCommand(command string) (string, []string) {
 		if len(stack.s) > 0 {
 			if arg == '\'' {
 				stack.Pop()
-				continue
 			}
 			cur += string(arg)
 			continue
@@ -63,7 +62,6 @@ func parseCommand(command string) (string, []string) {
 
 		if arg == '\'' {
 			stack.Push(idx)
-			continue
 		}
 
 		if arg == ' ' {
@@ -102,6 +100,15 @@ func handleExecutable(cmd string, args []string) {
 	}
 }
 
+func output(args []string) {
+	var cleanArgs []string
+	for _, arg := range args {
+		cleanArgs = append(cleanArgs, strings.ReplaceAll(arg, "'", ""))
+	}
+
+	fmt.Println(strings.Join(cleanArgs, " "))
+}
+
 func main() {
 	var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
 
@@ -117,7 +124,7 @@ func main() {
 		case "exit":
 			os.Exit(0)
 		case "echo":
-			fmt.Println(strings.Join(args, " "))
+			output(args)
 		case "cd":
 			dir := args[0]
 			if args[0] == "~" {
