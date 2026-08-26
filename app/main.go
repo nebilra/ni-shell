@@ -42,25 +42,13 @@ func (s *stack) Pop() (rune, error) {
 
 func parseCommand(command string) (string, []string) {
 	command = strings.TrimSpace(command)
-	parts := strings.SplitN(command, " ", 2)
 
-	if len(parts) == 0 {
-		return "", []string{}
-	}
-
-	if len(parts) == 1 {
-		return parts[0], []string{}
-	}
-
-	cmd := parts[0]
-	rest := parts[1]
-
-	var args []string
+	var parts []string
 	var cur string
 	stack := stack{}
 	var escape bool
 
-	for _, arg := range rest {
+	for _, arg := range command {
 		if escape {
 			cur += string(arg)
 			escape = false
@@ -88,7 +76,7 @@ func parseCommand(command string) (string, []string) {
 
 		if arg == ' ' {
 			if len(cur) > 0 {
-				args = append(args, cur)
+				parts = append(parts, cur)
 				cur = ""
 			}
 			continue
@@ -96,10 +84,18 @@ func parseCommand(command string) (string, []string) {
 		cur += string(arg)
 	}
 	if len(cur) > 0 {
-		args = append(args, cur)
+		parts = append(parts, cur)
 	}
 
-	return cmd, args
+	if len(parts) == 0 {
+		return "", []string{}
+	}
+
+	if len(parts) == 1 {
+		return parts[0], []string{}
+	}
+
+	return parts[0], parts[1:]
 }
 
 func handleExecutable(cmd string, args []string) {
