@@ -66,9 +66,11 @@ func parseCommand(command string) (string, []string) {
 			continue
 		}
 
-		if arg == ' ' && len(cur) > 0 {
-			args = append(args, cur)
-			cur = ""
+		if arg == ' ' {
+			if len(cur) > 0 {
+				args = append(args, cur)
+				cur = ""
+			}
 			continue
 		}
 		cur += string(arg)
