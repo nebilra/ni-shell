@@ -211,6 +211,9 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 			out = append(out, []rune(trimmed+" "))
 		}
 	}
+	if len(out) == 0 {
+		fmt.Print("\a")
+	}
 
 	return out, pos
 }
