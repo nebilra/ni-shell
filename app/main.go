@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -206,7 +207,25 @@ type AutoCompleter struct {
 
 func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	var out [][]rune
-	for _, cmd := range builtin {
+	var completions []string
+	completions = append(completions, builtin...)
+
+	path := filepath.SplitList(os.Getenv("PATH"))
+
+	for _, dir := range path {
+		dir = filepath.Clean(dir)
+		contents, dirErr := os.ReadDir(dir)
+		if dirErr != nil {
+			continue
+		}
+		for _, file := range contents {
+			if isExec, _ := isExecutable(file.Name()); isExec {
+				completions = append(completions, file.Name())
+			}
+		}
+	}
+
+	for _, cmd := range completions {
 		if trimmed, ok := strings.CutPrefix(cmd, string(line)); ok {
 			out = append(out, []rune(trimmed+" "))
 		}
