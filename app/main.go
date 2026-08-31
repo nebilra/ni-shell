@@ -102,7 +102,7 @@ func parseCommand(command string) (string, []string) {
 func handleExecutable(cmd string, args []string, idx int) {
 	isExec, _ := isExecutable(cmd)
 	if !isExec {
-		output(fmt.Sprintf("%s: command not found\n", cmd), idx, args)
+		output(fmt.Sprintf("%s: command not found", cmd), idx, args)
 		return
 	}
 
