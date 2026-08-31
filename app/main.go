@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+type Command struct {
+	input      string
+	cmd        string
+	args       []string
+	cmdArgs    []string
+	outputArgs []string
+	outputSign string
+	outputFile *os.File
+	redirected bool
+}
+
 func isExecutable(path string) (bool, string) {
 	if cmd, err := exec.LookPath(path); err == nil {
 		return true, cmd
@@ -23,15 +34,15 @@ func isExecutable(path string) (bool, string) {
 	return info.Mode()&0111 != 0, path
 }
 
-func parseCommand(command string) (string, []string) {
-	command = strings.TrimSpace(command)
+func (c *Command) parseCommand() {
+	c.input = strings.TrimSpace(c.input)
 
 	var parts []string
 	var cur string
 	var quote rune
 	var escape bool
 
-	for _, arg := range command {
+	for _, arg := range c.input {
 		if escape {
 			cur += string(arg)
 			escape = false
@@ -89,99 +100,92 @@ func parseCommand(command string) (string, []string) {
 	}
 
 	if len(parts) == 0 {
-		return "", []string{}
-	}
-
-	if len(parts) == 1 {
-		return parts[0], []string{}
-	}
-
-	return parts[0], parts[1:]
-}
-
-func handleExecutable(cmd string, args []string, idx int) {
-	isExec, _ := isExecutable(cmd)
-	if !isExec {
-		output(fmt.Sprintf("%s: command not found", cmd), idx, args)
+		c.cmd = ""
+		c.args = []string{}
 		return
 	}
 
-	if idx != -1 {
-		command := exec.Command(cmd, args[:idx]...)
-		file, fileErr := os.OpenFile(args[idx+1], os.O_CREATE|os.O_WRONLY, 0644)
-
-		if fileErr != nil {
-			fmt.Println("Error writing to file:", fileErr)
-		}
-
-		command.Stdout, command.Stderr = outputChannel(args[idx], file)
-		err := command.Run()
-
-		if err != nil {
-			return
-		}
-	} else {
-		command := exec.Command(cmd, args...)
-
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-		err := command.Run()
-		if err != nil {
-			return
-		}
+	if len(parts) == 1 {
+		c.cmd = parts[0]
+		c.args = []string{}
 	}
 
+	c.cmd = parts[0]
+	c.args = parts[1:]
+	c.isRedirected()
 }
 
-func output(value string, idx int, args []string) {
-	if idx != -1 {
-		redirectOutput(func() { fmt.Println(value) }, args[idx], args[idx+1])
+func (c *Command) handleExecutable() {
+	isExec, _ := isExecutable(c.cmd)
+	if !isExec {
+		c.output(fmt.Sprintf("%s: command not found", c.cmd))
+		return
+	}
+
+	command := exec.Command(c.cmd, c.cmdArgs...)
+	command.Stdout, command.Stderr = c.outputChannel()
+
+	err := command.Run()
+
+	if err != nil {
+		return
+	}
+}
+
+func (c *Command) output(value string) {
+	if c.redirected {
+		stdout := os.Stdout
+		stderr := os.Stderr
+
+		os.Stdout, os.Stderr = c.outputChannel()
+		fmt.Println(value)
+
+		os.Stdout = stdout
+		os.Stderr = stderr
 		return
 	}
 	fmt.Println(value)
 }
 
-func outputChannel(sign string, file *os.File) (*os.File, *os.File) {
-	switch sign {
+func (c *Command) outputChannel() (*os.File, *os.File) {
+	var fileErr error
+	if c.redirected {
+		c.outputFile, fileErr = os.OpenFile(c.outputArgs[0], os.O_CREATE|os.O_WRONLY, 0644)
+
+		if fileErr != nil {
+			fmt.Println("Error writing to file:", fileErr)
+		}
+	}
+
+	switch c.outputSign {
 	case "1>":
 		fallthrough
 	case ">":
-		return file, os.Stderr
+		return c.outputFile, os.Stderr
 	case "2>1":
 		return os.Stdout, os.Stdout
 	case "2>":
-		return os.Stdout, file
+		return os.Stdout, c.outputFile
 	}
 
 	return os.Stdout, os.Stderr
 }
 
-func redirectOutput(callback func(), sign string, path string) {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
-
-	if err != nil {
-		fmt.Println("Error writing to file:", err)
-	}
-
-	defer file.Close()
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	os.Stdout, os.Stderr = outputChannel(sign, file)
-
-	callback()
-
-	os.Stdout = stdout
-	os.Stderr = stderr
-}
-
-func isRedirected(args []string) int {
-	return slices.IndexFunc(args, func(val string) bool {
+func (c *Command) isRedirected() {
+	idx := slices.IndexFunc(c.args, func(val string) bool {
 		return strings.Contains(
 			val,
 			">",
 		)
 	})
+	c.redirected = idx != -1
+	c.cmdArgs = c.args
+
+	if c.redirected {
+		c.outputSign = c.args[idx]
+		c.cmdArgs = c.args[:idx]
+		c.outputArgs = c.args[idx+1:]
+	}
 }
 
 func main() {
@@ -190,31 +194,26 @@ func main() {
 	for {
 		fmt.Print("$ ")
 		command, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		cmd, args := parseCommand(command)
 
 		if err != nil {
 			panic(err)
 		}
-		idx := isRedirected(args)
-		redirected := idx != -1
 
-		switch cmd {
+		c := Command{
+			input: command,
+		}
+		c.parseCommand()
+		switch c.cmd {
 		case "exit":
 			os.Exit(0)
 		case "echo":
-			if redirected {
-				redirectOutput(func() {
-					fmt.Println(strings.Join(args[:idx], " "))
-				}, args[idx], args[idx+1])
-			} else {
-				fmt.Println(strings.Join(args, " "))
-			}
+			c.output(strings.Join(c.cmdArgs, " "))
 		case "cd":
-			dir := args[0]
-			if args[0] == "~" {
+			dir := c.cmdArgs[0]
+			if c.cmdArgs[0] == "~" {
 				home, err := os.UserHomeDir()
 				if err != nil {
-					output(fmt.Sprintf("cd: %s: No such file or directory", args[0]), idx, args)
+					c.output(fmt.Sprintf("cd: %s: No such file or directory", c.cmdArgs[0]))
 					break
 				}
 				dir = home
@@ -222,25 +221,28 @@ func main() {
 			err := os.Chdir(dir)
 
 			if err != nil {
-				output(fmt.Sprintf("cd: %s: No such file or directory", args[0]), idx, args)
+				c.output(fmt.Sprintf("cd: %s: No such file or directory", c.cmdArgs[0]))
 			}
 		case "pwd":
 			dir, err := os.Getwd()
 			if err != nil {
-				output(err.Error(), idx, args)
+				c.output(err.Error())
 				break
 			}
-			output(dir, idx, args)
+			c.output(dir)
 		case "type":
-			if slices.Contains(builtin, args[0]) {
-				output(fmt.Sprintf("%s is a shell builtin", args[0]), idx, args)
-			} else if dir, err := exec.LookPath(args[0]); err == nil {
-				output(fmt.Sprintf("%s is %s", args[0], dir), idx, args)
+			if slices.Contains(builtin, c.cmdArgs[0]) {
+				c.output(fmt.Sprintf("%s is a shell builtin", c.cmdArgs[0]))
+			} else if dir, err := exec.LookPath(c.cmdArgs[0]); err == nil {
+				c.output(fmt.Sprintf("%s is %s", c.cmdArgs[0], dir))
 			} else {
-				output(fmt.Sprintf("%s: not found", args[0]), idx, args)
+				c.output(fmt.Sprintf("%s: not found", c.cmdArgs[0]))
 			}
 		default:
-			handleExecutable(cmd, args, idx)
+			c.handleExecutable()
+		}
+		if c.redirected {
+			c.outputFile.Close()
 		}
 	}
 
