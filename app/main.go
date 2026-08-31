@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/chzyer/readline"
 )
 
 type Command struct {
@@ -198,19 +199,41 @@ func (c *Command) isRedirected() {
 	}
 }
 
+var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
+
+type AutoCompleter struct {
+}
+
+func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
+	var out [][]rune
+	for _, cmd := range builtin {
+		if trimmed := strings.TrimLeft(cmd, string(line)); trimmed != cmd {
+			out = append(out, []rune(trimmed+" "))
+		}
+	}
+
+	return out, pos
+}
+
 func main() {
-	var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
-
 	for {
-		fmt.Print("$ ")
-		command, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		rl, rlerr := readline.New("$ ")
 
+		if rlerr != nil {
+			panic(rlerr)
+		}
+
+		defer rl.Close()
+
+		rl.Config.AutoComplete = &AutoCompleter{}
+
+		line, err := rl.Readline()
 		if err != nil {
-			panic(err)
+			break
 		}
 
 		c := Command{
-			input: command,
+			input: line,
 		}
 		c.parseCommand()
 		switch c.cmd {
@@ -255,5 +278,4 @@ func main() {
 			c.outputFile.Close()
 		}
 	}
-
 }
