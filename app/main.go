@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -231,6 +232,10 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 			out = append(out, []rune(trimmed+" "))
 		}
 	}
+	sort.Slice(out, func(i, j int) bool {
+		return string(out[i]) < string(out[j])
+	})
+
 	if len(out) == 0 {
 		fmt.Print("\a")
 	}
