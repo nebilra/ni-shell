@@ -207,7 +207,7 @@ type AutoCompleter struct {
 func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	var out [][]rune
 	for _, cmd := range builtin {
-		if trimmed := strings.TrimPrefix(cmd, string(line)); trimmed != cmd {
+		if trimmed, ok := strings.CutPrefix(cmd, string(line)); ok {
 			out = append(out, []rune(trimmed+" "))
 		}
 	}
