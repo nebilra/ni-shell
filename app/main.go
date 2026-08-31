@@ -106,20 +106,26 @@ func handleExecutable(cmd string, args []string, idx int) {
 		return
 	}
 
-	command := exec.Command(cmd, args...)
-
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-
 	if idx != -1 {
-		redirectOutput(func() {
-			err := command.Run()
-			if err != nil {
-				output(fmt.Sprintf("Error running command:", err.Error()), idx, args)
-				return
-			}
-		}, args[idx], args[idx+1])
+		command := exec.Command(cmd, args[:idx]...)
+		file, fileErr := os.OpenFile(args[idx+1], os.O_CREATE|os.O_WRONLY, 0644)
+
+		if fileErr != nil {
+			fmt.Println("Error writing to file:", fileErr)
+		}
+
+		command.Stdout, command.Stderr = outputChannel(args[idx], file)
+		err := command.Run()
+
+		if err != nil {
+			fmt.Println("Error running command:", err.Error())
+			return
+		}
 	} else {
+		command := exec.Command(cmd, args...)
+
+		command.Stdout = os.Stdout
+		command.Stderr = os.Stderr
 		err := command.Run()
 		if err != nil {
 			fmt.Println("Error running command:", err.Error())
@@ -137,6 +143,21 @@ func output(value string, idx int, args []string) {
 	fmt.Println(value)
 }
 
+func outputChannel(sign string, file *os.File) (*os.File, *os.File) {
+	switch sign {
+	case "1>":
+		fallthrough
+	case ">":
+		return file, os.Stderr
+	case "2>1":
+		return os.Stdout, os.Stdout
+	case "2>":
+		return os.Stdout, file
+	}
+
+	return os.Stdout, os.Stderr
+}
+
 func redirectOutput(callback func(), sign string, path string) {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 
@@ -148,16 +169,7 @@ func redirectOutput(callback func(), sign string, path string) {
 	stdout := os.Stdout
 	stderr := os.Stderr
 
-	switch sign {
-	case "1>":
-		fallthrough
-	case ">":
-		os.Stdout = file
-	case "2>1":
-		os.Stderr = os.Stdout
-	case "2>":
-		os.Stderr = file
-	}
+	os.Stdout, os.Stderr = outputChannel(sign, file)
 
 	callback()
 
