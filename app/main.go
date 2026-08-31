@@ -2,11 +2,11 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -23,29 +23,12 @@ func isExecutable(path string) (bool, string) {
 	return info.Mode()&0111 != 0, path
 }
 
-type stack struct{ s []rune }
-
-func (s *stack) Push(value rune) {
-	s.s = append(s.s, value)
-}
-
-func (s *stack) Pop() (rune, error) {
-	n := len(s.s)
-	if n == 0 {
-		return 0, errors.New("Empty stack")
-
-	}
-	res := s.s[n-1]
-	s.s = s.s[:n-1]
-	return res, nil
-}
-
 func parseCommand(command string) (string, []string) {
 	command = strings.TrimSpace(command)
 
 	var parts []string
 	var cur string
-	stack := stack{}
+	var quote rune
 	var escape bool
 
 	for _, arg := range command {
@@ -55,14 +38,14 @@ func parseCommand(command string) (string, []string) {
 			continue
 		}
 
-		if arg == '\\' && !(len(stack.s) > 0 && stack.s[len(stack.s)-1] == '\'') {
+		if arg == '\\' && quote != '\'' {
 			escape = true
 			continue
 		}
 
-		if len(stack.s) > 0 {
-			if arg == stack.s[len(stack.s)-1] {
-				stack.Pop()
+		if quote != 0 {
+			if arg == quote {
+				quote = 0
 				continue
 			}
 			cur += string(arg)
@@ -70,7 +53,7 @@ func parseCommand(command string) (string, []string) {
 		}
 
 		if arg == '\'' || arg == '"' {
-			stack.Push(arg)
+			quote = arg
 			continue
 		}
 
@@ -80,6 +63,24 @@ func parseCommand(command string) (string, []string) {
 				cur = ""
 			}
 			continue
+		}
+		if arg == '>' {
+			if len(cur) > 0 {
+				num, err := strconv.Atoi(string(cur[len(cur)-1]))
+				if err == nil && num < 3 {
+					if len(cur[:len(cur)-1]) > 0 {
+						parts = append(parts, cur[:len(cur)-1])
+					}
+					parts = append(parts, string(cur[len(cur)-1])+string(arg))
+					cur = ""
+					continue
+				}
+				parts = append(parts, cur)
+				parts = append(parts, string(arg))
+				cur = ""
+				continue
+			}
+
 		}
 		cur += string(arg)
 	}
@@ -98,10 +99,10 @@ func parseCommand(command string) (string, []string) {
 	return parts[0], parts[1:]
 }
 
-func handleExecutable(cmd string, args []string) {
+func handleExecutable(cmd string, args []string, idx int) {
 	isExec, _ := isExecutable(cmd)
 	if !isExec {
-		fmt.Printf("%s: command not found\n", cmd)
+		output(fmt.Sprintf("%s: command not found\n", cmd), idx, args)
 		return
 	}
 
@@ -110,12 +111,67 @@ func handleExecutable(cmd string, args []string) {
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 
-	err := command.Run()
+	if idx != -1 {
+		redirectOutput(func() {
+			err := command.Run()
+			if err != nil {
+				output(fmt.Sprintf("Error running command:", err.Error()), idx, args)
+				return
+			}
+		}, args[idx], args[idx+1])
+	} else {
+		err := command.Run()
+		if err != nil {
+			fmt.Println("Error running command:", err.Error())
+			return
+		}
+	}
 
-	if err != nil {
-		fmt.Println("Error running command:", err.Error())
+}
+
+func output(value string, idx int, args []string) {
+	if idx != -1 {
+		redirectOutput(func() { fmt.Println(value) }, args[idx], args[idx+1])
 		return
 	}
+	fmt.Println(value)
+}
+
+func redirectOutput(callback func(), sign string, path string) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+	}
+
+	defer file.Close()
+	stdout := os.Stdout
+	stderr := os.Stderr
+
+	switch sign {
+	case "1>":
+		fallthrough
+	case ">":
+		os.Stdout = file
+	case "2>1":
+		os.Stderr = os.Stdout
+	case "2>":
+		os.Stderr = file
+	}
+
+	callback()
+
+	os.Stdout = stdout
+	os.Stderr = stderr
+}
+
+func isRedirected(args []string) int {
+	return slices.IndexFunc(args, func(val string) bool {
+		return strings.Contains(
+			val,
+			">",
+		)
+	})
 }
 
 func main() {
@@ -129,17 +185,26 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		idx := isRedirected(args)
+		redirected := idx != -1
+
 		switch cmd {
 		case "exit":
 			os.Exit(0)
 		case "echo":
-			fmt.Println(strings.Join(args, " "))
+			if redirected {
+				redirectOutput(func() {
+					fmt.Println(strings.Join(args[:idx], " "))
+				}, args[idx], args[idx+1])
+			} else {
+				fmt.Println(strings.Join(args, " "))
+			}
 		case "cd":
 			dir := args[0]
 			if args[0] == "~" {
 				home, err := os.UserHomeDir()
 				if err != nil {
-					fmt.Printf("cd: %s: No such file or directory\n", args[0])
+					output(fmt.Sprintf("cd: %s: No such file or directory", args[0]), idx, args)
 					break
 				}
 				dir = home
@@ -147,25 +212,25 @@ func main() {
 			err := os.Chdir(dir)
 
 			if err != nil {
-				fmt.Printf("cd: %s: No such file or directory\n", args[0])
+				output(fmt.Sprintf("cd: %s: No such file or directory", args[0]), idx, args)
 			}
 		case "pwd":
 			dir, err := os.Getwd()
 			if err != nil {
-				fmt.Println(err.Error())
+				output(err.Error(), idx, args)
 				break
 			}
-			fmt.Println(dir)
+			output(dir, idx, args)
 		case "type":
 			if slices.Contains(builtin, args[0]) {
-				fmt.Printf("%s is a shell builtin\n", args[0])
+				output(fmt.Sprintf("%s is a shell builtin", args[0]), idx, args)
 			} else if dir, err := exec.LookPath(args[0]); err == nil {
-				fmt.Printf("%s is %s\n", args[0], dir)
+				output(fmt.Sprintf("%s is %s", args[0], dir), idx, args)
 			} else {
-				fmt.Printf("%s: not found\n", args[0])
+				output(fmt.Sprintf("%s: not found", args[0]), idx, args)
 			}
 		default:
-			handleExecutable(cmd, args)
+			handleExecutable(cmd, args, idx)
 		}
 	}
 
