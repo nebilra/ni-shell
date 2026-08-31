@@ -19,6 +19,7 @@ type Command struct {
 	outputSign string
 	outputFile *os.File
 	redirected bool
+	appended   bool
 }
 
 func isExecutable(path string) (bool, string) {
@@ -42,7 +43,7 @@ func (c *Command) parseCommand() {
 	var quote rune
 	var escape bool
 
-	for _, arg := range c.input {
+	for idx, arg := range c.input {
 		if escape {
 			cur += string(arg)
 			escape = false
@@ -76,6 +77,11 @@ func (c *Command) parseCommand() {
 			continue
 		}
 		if arg == '>' {
+			if rune(c.input[idx-1]) == arg {
+				c.appended = true
+				continue
+			}
+
 			if len(cur) > 0 {
 				num, err := strconv.Atoi(string(cur[len(cur)-1]))
 				if err == nil && num < 3 {
@@ -150,7 +156,11 @@ func (c *Command) output(value string) {
 func (c *Command) outputChannel() (*os.File, *os.File) {
 	var fileErr error
 	if c.redirected {
-		c.outputFile, fileErr = os.OpenFile(c.outputArgs[0], os.O_CREATE|os.O_WRONLY, 0644)
+		if c.appended {
+			c.outputFile, fileErr = os.OpenFile(c.outputArgs[0], os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		} else {
+			c.outputFile, fileErr = os.OpenFile(c.outputArgs[0], os.O_CREATE|os.O_WRONLY, 0644)
+		}
 
 		if fileErr != nil {
 			fmt.Println("Error writing to file:", fileErr)
