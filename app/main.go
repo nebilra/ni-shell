@@ -241,15 +241,16 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 
 			return
 		}
-		var options strings.Builder
-		options.WriteString("\n")
-		for _, val := range out {
-			options.WriteString(string(line))
-			options.WriteString(string(val))
-			options.WriteString(" ")
-		}
-		fmt.Println(options.String())
-		return
+		ac.tabbed = false
+		// var options strings.Builder
+		// options.WriteString("\n")
+		// for _, val := range out {
+		// 	options.WriteString(string(line))
+		// 	options.WriteString(string(val))
+		// 	options.WriteString(" ")
+		// }
+		// fmt.Println(options.String())
+		// return out, 0
 	}
 
 	return out, pos
