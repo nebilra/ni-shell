@@ -118,7 +118,6 @@ func handleExecutable(cmd string, args []string, idx int) {
 		err := command.Run()
 
 		if err != nil {
-			fmt.Println("Error running command:", err.Error())
 			return
 		}
 	} else {
@@ -128,7 +127,6 @@ func handleExecutable(cmd string, args []string, idx int) {
 		command.Stderr = os.Stderr
 		err := command.Run()
 		if err != nil {
-			fmt.Println("Error running command:", err.Error())
 			return
 		}
 	}
