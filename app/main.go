@@ -203,6 +203,7 @@ func (c *Command) isRedirected() {
 var builtin = []string{"exit", "echo", "type", "pwd", "cd"}
 
 type AutoCompleter struct {
+	tabbed bool
 }
 
 func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
@@ -219,7 +220,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 			continue
 		}
 		for _, file := range contents {
-			if isExec, _ := isExecutable(file.Name()); isExec {
+			if isExec, _ := isExecutable(file.Name()); isExec && !slices.Contains(builtin, file.Name()) {
 				completions = append(completions, file.Name())
 			}
 		}
@@ -232,6 +233,23 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 	}
 	if len(out) == 0 {
 		fmt.Print("\a")
+	}
+	if len(out) > 1 {
+		if !ac.tabbed {
+			fmt.Print("\a")
+			ac.tabbed = true
+
+			return
+		}
+		var options strings.Builder
+		options.WriteString("\n")
+		for _, val := range out {
+			options.WriteString(string(line))
+			options.WriteString(string(val))
+			options.WriteString("  ")
+		}
+		fmt.Println(options.String())
+		return
 	}
 
 	return out, pos
