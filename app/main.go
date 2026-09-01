@@ -232,6 +232,7 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 			out = append(out, []rune(trimmed+" "))
 		}
 	}
+
 	sort.Slice(out, func(i, j int) bool {
 		return string(out[i]) < string(out[j])
 	})
@@ -239,27 +240,50 @@ func (ac *AutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int)
 	if len(out) == 0 {
 		fmt.Print("\a")
 	}
-	if len(out) > 1 {
-		if !ac.tabbed {
-			fmt.Print("\a")
-			ac.tabbed = true
 
-			return
-		}
-		ac.tabbed = false
-		var options strings.Builder
-		options.WriteString("\n")
-		for _, val := range out {
-			options.WriteString(string(line))
-			options.WriteString(string(val))
-			options.WriteString(" ")
-		}
-		fmt.Println(options.String())
-		fmt.Printf("$ %s", string(line))
-		return nil, 0
+	if len(out) == 1 {
+		return out, pos
 	}
 
-	return out, pos
+	commonCount := 0
+	found := false
+	for {
+		ref := out[0][commonCount]
+		for _, val := range out {
+			if val[commonCount] != ref {
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+		commonCount += 1
+	}
+
+	if !ac.tabbed {
+		fmt.Print("\a")
+		ac.tabbed = true
+
+		if commonCount > 0 {
+			var common [][]rune
+			common = append(common, out[0][:commonCount])
+			return common, pos
+		}
+		return
+	}
+	ac.tabbed = false
+	var options strings.Builder
+	options.WriteString("\n")
+	for _, val := range out {
+		options.WriteString(string(line))
+		options.WriteString(string(val))
+		options.WriteString(" ")
+	}
+	fmt.Println(options.String())
+	fmt.Printf("$ %s", string(line))
+	return nil, 0
+
 }
 
 func main() {
